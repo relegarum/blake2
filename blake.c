@@ -64,7 +64,27 @@ typedef struct blake_struct
   uint32_t states[16];
 } blake_ctx;
 
-static void blake_prepare( blake_ctx* ctx )
+static inline void blake_g(uint32_t *a,
+                           uint32_t *b,
+                           uint32_t *c,
+                           uint32_t *d,
+                           uint32_t const factor1,
+                           uint32_t const factor2 )
+{
+  /**a += *b + ( memory_block1 ^ constant2 );*/
+  *a += *b + factor1;
+  *d = ROTATE_RIGHT( ( *d ^ *a ), 16 );
+  *c += *d;
+  *b = ROTATE_RIGHT( ( *b ^ *c ), 12 );
+  /**a += *b + ( memory_block2  ^ constant2 );*/
+  *a += *b + factor2;
+  *d = ROTATE_RIGHT( ( *d ^ *a ), 8 );
+  *c += *d;
+  *b = ROTATE_RIGHT( ( *b ^ *c ), 7 );
+}
+
+
+static void blake_prepare( blake_ctx* ctx, const uint8_t *block )
 {
   ctx->states[ 0] = ctx->hash_state[0];
   ctx->states[ 1] = ctx->hash_state[1];
@@ -82,6 +102,9 @@ static void blake_prepare( blake_ctx* ctx )
   ctx->states[13] = ctx->count[0] ^ blake_constants[5];
   ctx->states[14] = ctx->count[1] ^ blake_constants[6];
   ctx->states[15] = ctx->count[1] ^ blake_constants[7];
+
+  for( int i = 0; i < 16; ++i )
+    ctx->message_block[i] = UINT8_TO_32_BIG_ENDIAN( (block + ( i * 4 )) );
 }
 
 static void blake_init( blake_ctx* ctx )
@@ -97,12 +120,27 @@ static void blake_init( blake_ctx* ctx )
   ctx->hash_state[7] = initial_state[7];
 }
 
-static void blake_compress( blake_ctx* const ctx )
+static inline void blake_round( blake_ctx* const ctx, const uint32_t round )
 {
+  blake_g(&ctx->states[0], &ctx->states[4], &ctx->states[ 8], &ctx->states[12], G_FACTORS( round, 0, ctx, blake_constants, sigma));
+  blake_g(&ctx->states[1], &ctx->states[5], &ctx->states[ 9], &ctx->states[13], G_FACTORS( round, 1, ctx, blake_constants, sigma));
+  blake_g(&ctx->states[2], &ctx->states[6], &ctx->states[10], &ctx->states[14], G_FACTORS( round, 2, ctx, blake_constants, sigma));
+  blake_g(&ctx->states[3], &ctx->states[7], &ctx->states[11], &ctx->states[15], G_FACTORS( round, 3, ctx, blake_constants, sigma));
+
+
+  blake_g(&ctx->states[0], &ctx->states[5], &ctx->states[10], &ctx->states[15], G_FACTORS( round, 4, ctx, blake_constants, sigma));
+  blake_g(&ctx->states[1], &ctx->states[6], &ctx->states[11], &ctx->states[12], G_FACTORS( round, 5, ctx, blake_constants, sigma));
+  blake_g(&ctx->states[2], &ctx->states[7], &ctx->states[ 8], &ctx->states[13], G_FACTORS( round, 6, ctx, blake_constants, sigma));
+  blake_g(&ctx->states[3], &ctx->states[4], &ctx->states[ 9], &ctx->states[14], G_FACTORS( round, 7, ctx, blake_constants, sigma));
 }
 
-static void blake_round( blake_ctx* const ctx, const uint32_t round )
+static void blake_compress( blake_ctx* const ctx, const uint8_t* block)
 {
+  blake_prepare( ctx, block );
+  for( int round = 0; round < 14; ++round )
+  {
+    blake_round( ctx, round );
+  }
 }
 
 static void blake_end( blake_ctx* const ctx )
@@ -121,7 +159,12 @@ static void blake_end( blake_ctx* const ctx )
 
 int blake_hash(const char* const message,
                const size_t message_size,
-               char* output,
-               size_t output_size )
+               char* output )
 {
+  blake_ctx ctx[1];
+  blake_init( ctx );
+  blake_compress( ctx );
+  blake_end( ctx );
+
+
 }
