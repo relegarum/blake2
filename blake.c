@@ -62,6 +62,10 @@ typedef struct blake_struct
   uint32_t salt[4];
   uint32_t count[2];
   uint32_t states[16];
+
+  size_t position;
+  size_t total;
+
 } blake_ctx;
 
 static inline void blake_g(uint32_t *a,
@@ -84,7 +88,7 @@ static inline void blake_g(uint32_t *a,
 }
 
 
-static void blake_prepare( blake_ctx* ctx, const uint8_t *block )
+static void blake_setup_block( blake_ctx* ctx, const uint8_t *block )
 {
   ctx->states[ 0] = ctx->hash_state[0];
   ctx->states[ 1] = ctx->hash_state[1];
@@ -104,7 +108,7 @@ static void blake_prepare( blake_ctx* ctx, const uint8_t *block )
   ctx->states[15] = ctx->count[1] ^ blake_constants[7];
 
   for( int i = 0; i < 16; ++i )
-    ctx->message_block[i] = UINT8_TO_32_BIG_ENDIAN( (block + ( i * 4 )) );
+    ctx->message_block[i] = UINT8_TO_32_BIG_ENDIAN( ( block + ( i * 4 ) ) );
 }
 
 static void blake_init( blake_ctx* ctx )
@@ -118,6 +122,8 @@ static void blake_init( blake_ctx* ctx )
   ctx->hash_state[5] = initial_state[5];
   ctx->hash_state[6] = initial_state[6];
   ctx->hash_state[7] = initial_state[7];
+  ctx->position = 0;
+  ctx->total    = 0;
 }
 
 static inline void blake_round( blake_ctx* const ctx, const uint32_t round )
@@ -134,19 +140,8 @@ static inline void blake_round( blake_ctx* const ctx, const uint32_t round )
   blake_g(&ctx->states[3], &ctx->states[4], &ctx->states[ 9], &ctx->states[14], G_FACTORS( round, 7, ctx, blake_constants, sigma));
 }
 
-static void blake_compress( blake_ctx* const ctx, const uint8_t* block)
+static inline void blake_end_block( blake_ctx* const ctx )
 {
-  blake_prepare( ctx, block );
-  for( int round = 0; round < 14; ++round )
-  {
-    blake_round( ctx, round );
-  }
-}
-
-static void blake_end( blake_ctx* const ctx )
-{
-
-  /*Very last*/
   ctx->hash_state[0] = ctx->hash_state[0] ^ ctx->salt[0] ^ ctx->states[0] ^ ctx->states[ 8];
   ctx->hash_state[1] = ctx->hash_state[1] ^ ctx->salt[1] ^ ctx->states[1] ^ ctx->states[ 9];
   ctx->hash_state[2] = ctx->hash_state[2] ^ ctx->salt[2] ^ ctx->states[2] ^ ctx->states[10];
@@ -157,14 +152,53 @@ static void blake_end( blake_ctx* const ctx )
   ctx->hash_state[7] = ctx->hash_state[7] ^ ctx->salt[3] ^ ctx->states[7] ^ ctx->states[15];
 }
 
+static void blake_compress_block( blake_ctx* const ctx, const uint8_t* block )
+{
+  blake_setup_block( ctx, block );
+  for( int round = 0; round < 14; ++round )
+  {
+    blake_round( ctx, round );
+  }
+  blake_end_block( ctx );
+}
+
+static void blake_end( blake_ctx* const ctx, uint8_t* output )
+{
+  INT32_TO_UINT8_BIG_ENDIAN( output +  0, ctx->hash_state[0] );  
+  INT32_TO_UINT8_BIG_ENDIAN( output +  4, ctx->hash_state[1] );  
+  INT32_TO_UINT8_BIG_ENDIAN( output +  8, ctx->hash_state[2] );  
+  INT32_TO_UINT8_BIG_ENDIAN( output + 12, ctx->hash_state[3] );  
+  INT32_TO_UINT8_BIG_ENDIAN( output + 16, ctx->hash_state[4] );  
+  INT32_TO_UINT8_BIG_ENDIAN( output + 20, ctx->hash_state[5] );  
+  INT32_TO_UINT8_BIG_ENDIAN( output + 24, ctx->hash_state[6] );  
+  INT32_TO_UINT8_BIG_ENDIAN( output + 28, ctx->hash_state[7] );  
+}
+
+static void blake_update( blake_ctx* const ctx, const char* message, size_t message_size )
+{
+  const size_t block_size_bytes = BLOCK_SIZE >> 3;
+  while( ctx->position + message_size >= block_size_bytes )
+  {
+    uint8_t* block = alloca( block_size_bytes );
+    const size_t diff = block_size_bytes - ctx->position;
+    memcpy( block, message, diff );
+    message_size -= diff;
+    ctx->total   += ( diff ) << 3;
+    blake_compress_block( ctx, block );
+    message      += diff;
+    ctx->position = 0;
+  }
+
+}
+
 int blake_hash(const char* const message,
                const size_t message_size,
                char* output )
 {
   blake_ctx ctx[1];
   blake_init( ctx );
-  blake_compress( ctx );
-  blake_end( ctx );
+  blake_update( ctx, message, message_size );
+  blake_end( ctx, (uint8_t*) output );
 
-
+  return 0;
 }

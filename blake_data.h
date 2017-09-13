@@ -39,4 +39,6 @@
   c += d;                               \
   b = ROTATE_RIGHT( ( b ^ c ), 7 );     
 
+#define BLOCK_SIZE 512
+
 #endif /*BLAKE_DATA_H*/
