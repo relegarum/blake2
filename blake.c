@@ -224,7 +224,7 @@ static void blake_end( blake_ctx* const ctx, uint8_t* output )
 
 int blake_hash(const char* const message,
                const size_t message_size,
-               char* output )
+               char output[32] )
 {
   blake_ctx ctx[1];
   blake_init( ctx );

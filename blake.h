@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-int blake( char* const message, size_t message_size, char* output, size_t output_size );
+extern int blake_hash( const char* const message, const size_t message_size, char output[32] );
 
 #ifdef __cplusplus
 }
