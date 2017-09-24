@@ -109,7 +109,12 @@ static void blake_setup_block( blake_ctx* ctx )
   ctx->states[15] = ctx->count[1] ^ blake_constants[7];
 
   for( int i = 0; i < 16; ++i )
-    ctx->message_block[i] = UINT8_TO_32_BIG_ENDIAN( ( ctx->buffer + ( i * 4 ) ) );
+  { 
+    ctx->message_block[i] = ( ( ( uint32_t ) ( ( ctx->buffer + i * 4 )[ 0 ] ) << 24 ) |
+                              ( ( uint32_t ) ( ( ctx->buffer + i * 4 )[ 1 ] ) << 16 ) | 
+                              ( ( uint32_t ) ( ( ctx->buffer + i * 4 )[ 2 ] ) << 8 ) | 
+                              ( ( uint32_t ) ( ( ctx->buffer + i * 4 )[ 3 ] ) ) );//UINT8_TO_32_BIG_ENDIAN(  ctx->buffer +  i * 4  );
+  }
 }
 
 static void blake_init( blake_ctx* ctx )
@@ -129,6 +134,8 @@ static void blake_init( blake_ctx* ctx )
 
 static inline void blake_round( blake_ctx* const ctx, const uint32_t round )
 {
+  uint32_t factor1 = ( G_FACTOR1( round, 0, ctx, blake_constants, sigma ) );
+  uint32_t factor2 = ( G_FACTOR2( round, 0, ctx, blake_constants, sigma ) );
   blake_g(&ctx->states[0], &ctx->states[4], &ctx->states[ 8], &ctx->states[12], G_FACTORS( round, 0, ctx, blake_constants, sigma));
   blake_g(&ctx->states[1], &ctx->states[5], &ctx->states[ 9], &ctx->states[13], G_FACTORS( round, 1, ctx, blake_constants, sigma));
   blake_g(&ctx->states[2], &ctx->states[6], &ctx->states[10], &ctx->states[14], G_FACTORS( round, 2, ctx, blake_constants, sigma));
@@ -171,8 +178,9 @@ static void blake_update( blake_ctx* const ctx, const char* message, size_t mess
     memcpy( ctx->buffer + ctx->position, message, diff );
     message_size -= diff;
     ctx->total   += ( diff ) << 3;
-    ctx->count[0] = (uint32_t) ctx->total;
-    ctx->count[1] = (uint32_t) ( ( ctx->total ) >> 32 );
+    int64_t t = ctx->total;
+    ctx->count[0] = (uint32_t) t;
+    ctx->count[1] = (uint32_t) ( ( t ) >> 32 );
     blake_compress_block( ctx );
     message      += diff;
     ctx->position = 0;
@@ -181,6 +189,9 @@ static void blake_update( blake_ctx* const ctx, const char* message, size_t mess
   memcpy( ctx->buffer + ctx->position, message, message_size );
   ctx->position += message_size;
   ctx->total += message_size << 3;
+  int64_t t = ctx->total;
+  ctx->count[ 0 ] = ( uint32_t ) t;
+  ctx->count[ 1 ] = ( uint32_t ) ( ( t ) >> 32 );
 }
 
 static void blake_end( blake_ctx* const ctx, uint8_t* output )

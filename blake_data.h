@@ -21,10 +21,10 @@
   (p)[3] = ( uint8_t )((v) >>  0);
 
 #define G_FACTOR1(round, index, ctx, blake_constants, sigma) \
-  ctx->message_block[ sigma[ round ][ index ] ] ^ blake_constants[ sigma[ round ][ index + 1 ] ]
+  ctx->message_block[ sigma[ round ][ 2 * index ] ] ^ blake_constants[ sigma[ round ][ ( 2 * index ) + 1 ] ]
 
 #define G_FACTOR2(round, index, ctx, blake_constants, sigma) \
-  ctx->message_block[ sigma[ round ][ index + 1 ] ] ^ blake_constants[ sigma[ round ][ index ] ]
+  ctx->message_block[ sigma[ round ][ ( 2 * index ) + 1 ] ] ^ blake_constants[ sigma[ round ][ 2 * index ] ]
 
 #define G_FACTORS(round, index, ctx, blake_constants, sigma) \
   G_FACTOR1(round, index, ctx, blake_constants, sigma), G_FACTOR2(round, index, ctx, blake_constants, sigma)

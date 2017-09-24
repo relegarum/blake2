@@ -3,6 +3,22 @@
 
 #include "blake.h"
 #include <string.h>
+#include <stdio.h>
+
+// https://stackoverflow.com/questions/17261798/converting-a-hex-string-to-a-byte-array
+std::vector< unsigned char > ConvertHexToBytes( const std::string& hexString )
+{
+   std::vector< unsigned char > bytes;
+
+   for( size_t i = 0; i < hexString.size(); i += 2 )
+   {
+      auto byteString = hexString.substr( i, 2 );
+      auto byte = static_cast< char >( strtol( byteString.c_str(), NULL, 16 ) );
+      bytes.push_back( byte );
+   }
+
+   return bytes;
+}
 
 
 
@@ -14,9 +30,9 @@ TEST_CASE( "[empty]", "[blake]" )
 
   const char message[] = "";
   const auto message_size = sizeof(message) - 1;
-  char output[32] = { 0 };
+  uint8_t output[32] = { 0 };
 
-  blake_hash( message, message_size, output );
+  blake_hash( message, message_size, ( char* ) output );
 
   REQUIRE( !memcmp( expected_output, output, sizeof(output) - 1 ) );
 
@@ -24,9 +40,8 @@ TEST_CASE( "[empty]", "[blake]" )
 
 TEST_CASE( "[abc]", "[blake]" )
 {
-  unsigned char expected_output[] = {
-    0xf7, 0x55, 0xe0, 0x5e, 0x91, 0x59, 0x08, 0x10, 0x06, 0xc7, 0xaf, 0x24, 0xaa, 0x01, 0x47, 0xfc,
-    0x45, 0x1c, 0x95, 0xcc, 0x8b, 0x80, 0x22, 0x2b, 0xd2, 0x02, 0x35, 0x80, 0xf5, 0x4b, 0x32, 0x67 };
+  unsigned char expected_output[] = { 0x18, 0x33, 0xa9, 0xfa, 0x7c, 0xf4, 0x08, 0x6b, 0xd5, 0xfd, 0xa7, 0x3d, 0xa3, 0x2e, 
+                                      0x5a, 0x1d, 0x75, 0xb4, 0xc3, 0xf8, 0x9d, 0x5c, 0x43, 0x63, 0x69, 0xf9, 0xd7, 0x8b, 0xb2, 0xda, 0x5c, 0x28 };
 
 
   const char message[] = "abc";
@@ -42,8 +57,8 @@ TEST_CASE( "[abc]", "[blake]" )
 TEST_CASE( "[loremIpsum]", "[blake]" )
 {
    unsigned char expected_output[] = {
-     0xf9, 0xbc, 0xf1, 0xf7, 0xef, 0xeb, 0xcd, 0x79, 0x54, 0x64, 0x7b, 0xb4, 0x93, 0x04, 0x16, 0x8f,
-     0x53, 0x35, 0x63, 0x8a, 0xa9, 0x91, 0x55, 0x23, 0x0a, 0x61, 0x9a, 0x61, 0x27, 0x04, 0x61, 0x4f};
+      0x8a, 0xa7, 0xa8, 0x70, 0xdb, 0x62, 0x0d, 0x53, 0xcf, 0x5f, 0x05, 0xfd, 0xd0, 0xeb, 0x02, 0xb0, 
+      0x09, 0x20, 0xfe, 0x93, 0xfc, 0xa8, 0x57, 0x87, 0xde, 0xb8, 0xf0, 0x6d, 0xb1, 0x31, 0xab, 0xfc };
 
 
   const char message[] = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus a lacus ac metus sollicitudin porttitor."
@@ -59,5 +74,19 @@ TEST_CASE( "[loremIpsum]", "[blake]" )
 
   blake_hash( message, message_size, output );
 
-  REQUIRE( !memcmp( expected_output, output, sizeof(output) - 1 ) ); 
+
+  REQUIRE( !memcmp( expected_output, output, sizeof(output) - 1 ) );
+}
+
+TEST_CASE( "[QUICKFOX]", "[blake]" )
+{
+   auto expected_output = ConvertHexToBytes( "7576698ee9cad30173080678e5965916adbb11cb5245d386bf1ffda1cb26c9d7" );
+   const char message[] = "The quick brown fox jumps over the lazy dog";
+
+   const auto message_size = sizeof( message ) - 1;
+   char output[ 32 ] = { 0 };
+
+   blake_hash( message, message_size, output );
+
+   REQUIRE( !memcmp( expected_output.data(), output, sizeof( output ) - 1 ) );
 }
